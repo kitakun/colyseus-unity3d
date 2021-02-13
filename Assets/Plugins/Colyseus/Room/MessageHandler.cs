@@ -1,10 +1,4 @@
 using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using GameDevWare.Serialization;
-
-using UnityEngine;
 
 namespace Colyseus
 {
@@ -25,7 +19,7 @@ namespace Colyseus
 
 		public Type Type
 		{
-			get { return typeof(T); }
+			get => typeof(T);
 		}
 	}
 }

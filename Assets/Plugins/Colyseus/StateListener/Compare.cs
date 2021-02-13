@@ -1,27 +1,37 @@
 using System;
 using System.Linq;
-using System.Collections;
 using System.Collections.Generic;
 
 using GameDevWare.Serialization;
-using GameDevWare.Serialization.MessagePack;
 
 namespace Colyseus
 {
-	public struct PatchObject
+	public readonly struct PatchObject
 	{
-		public string[] path;
-		public string operation; // : "add" | "remove" | "replace";
-		public object value;
+		public readonly string[] Path;
+		// : "add" | "remove" | "replace";
+		public readonly OperationType Operation;
+		public readonly object Value;
+
+		public PatchObject(OperationType operation, string[] path, object value)
+		{
+			Path = path;
+			Operation = operation;
+			Value = value;
+		}
+
+		public PatchObject(OperationType operation, string[] path) : this(operation, path, null)
+		{
+
+		}
 	}
 
 	public class Compare
 	{
-
 		public static PatchObject[] GetPatchList(IndexedDictionary<string, object> tree1, IndexedDictionary<string, object> tree2)
 		{
-			List<PatchObject> patches = new List<PatchObject>();
-			List<string> path = new List<string>();
+			var patches = new List<PatchObject>();
+			var path = new List<string>();
 
 			Generate(tree1, tree2, patches, path);
 
@@ -30,17 +40,19 @@ namespace Colyseus
 
 		protected static void Generate(List<object> mirror, List<object> obj, List<PatchObject> patches, List<string> path)
 		{
-			var mirrorDict = new IndexedDictionary<string, object> ();
-			for (int i = 0; i < mirror.Count; i++) {
-				mirrorDict.Add (i.ToString(), mirror.ElementAt (i));
+			var mirrorDict = new IndexedDictionary<string, object>();
+			for (int i = 0; i < mirror.Count; i++)
+			{
+				mirrorDict.Add(i.ToString(), mirror.ElementAt(i));
 			}
 
-			var objDict = new IndexedDictionary<string, object> ();
-			for (int i = 0; i < obj.Count; i++) {
-				objDict.Add (i.ToString(), obj.ElementAt (i));
+			var objDict = new IndexedDictionary<string, object>();
+			for (int i = 0; i < obj.Count; i++)
+			{
+				objDict.Add(i.ToString(), obj.ElementAt(i));
 			}
 
-			Generate (mirrorDict, objDict, patches, path);
+			Generate(mirrorDict, objDict, patches, path);
 		}
 
 		// Dirty check if obj is different from mirror, generate patches and update mirror
@@ -50,11 +62,11 @@ namespace Colyseus
 			var oldKeys = mirror.Keys;
 			var deleted = false;
 
-			for (int i = 0; i < oldKeys.Count; i++) 
+			for (int i = 0; i < oldKeys.Count; i++)
 			{
-				var key = oldKeys [i];
+				var key = oldKeys[i];
 				if (
-					obj.ContainsKey(key) && 
+					obj.ContainsKey(key) &&
 					obj[key] != null &&
 					!(!obj.ContainsKey(key) && mirror.ContainsKey(key))
 				)
@@ -64,117 +76,106 @@ namespace Colyseus
 
 					if (
 						oldVal != null && newVal != null &&
-						!oldVal.GetType ().IsPrimitive && oldVal.GetType () != typeof(string) &&
-						!newVal.GetType ().IsPrimitive && newVal.GetType () != typeof(string) && 
-						Object.ReferenceEquals(oldVal.GetType (), newVal.GetType ())
+						!oldVal.GetType().IsPrimitive && oldVal.GetType() != typeof(string) &&
+						!newVal.GetType().IsPrimitive && newVal.GetType() != typeof(string) &&
+						Object.ReferenceEquals(oldVal.GetType(), newVal.GetType())
 					)
 					{
-						List<string> deeperPath = new List<string>(path);
-						deeperPath.Add((string) key);
+						var deeperPath = new List<string>(path)
+						{
+							key
+						};
 
-						if (oldVal is IndexedDictionary<string, object>) {
+						if (oldVal is IndexedDictionary<string, object> oldValDictionaryInstance)
+						{
 							Generate(
-								(IndexedDictionary<string, object>) oldVal,
-								(IndexedDictionary<string, object>) newVal,
+								oldValDictionaryInstance,
+								(IndexedDictionary<string, object>)newVal,
 								patches,
 								deeperPath
 							);
 
-						} else if (oldVal is List<object>) {
+						}
+						else if (oldVal is List<object> oldValListInstance)
+						{
 							Generate(
-								((List<object>) oldVal),
-								((List<object>) newVal),
+								oldValListInstance,
+								(List<object>)newVal,
 								patches,
 								deeperPath
 							);
 						}
-							
-					} else {
+
+					}
+					else
+					{
 						if (
 							(oldVal == null && newVal != null) ||
 							!oldVal.Equals(newVal)
 						)
 						{
-							List<string> replacePath = new List<string>(path);
-							replacePath.Add((string) key);
-
-							patches.Add(new PatchObject
+							var replacePath = new List<string>(path)
 							{
-								operation = "replace",
-								path = replacePath.ToArray(),
-								value = newVal
-							});
+								key
+							};
+
+							patches.Add(new PatchObject(OperationType.replace, replacePath.ToArray(), newVal));
 						}
 					}
 				}
-				else {
-					List<string> removePath = new List<string>(path);
-					removePath.Add((string) key);
-
-					patches.Add(new PatchObject
+				else
+				{
+					var removePath = new List<string>(path)
 					{
-						operation = "remove",
-						path = removePath.ToArray()
-					});
+						key
+					};
 
-					deleted = true; // property has been deleted
+					patches.Add(new PatchObject(OperationType.remove, removePath.ToArray()));
+
+					// property has been deleted
+					deleted = true;
 				}
 			}
 
-			if (!deleted && newKeys.Count == oldKeys.Count) {
-		        return;
-		    }
-
-			foreach (var key in newKeys)
+			if (!deleted && newKeys.Count == oldKeys.Count)
 			{
+				return;
+			}
 
+			foreach (string key in newKeys)
+			{
 				if (!mirror.ContainsKey(key) && obj.ContainsKey(key))
 				{
-					List<string> addPath = new List<string>(path);
-					addPath.Add((string) key);
+					var addPath = new List<string>(path)
+					{
+						key
+					};
 
-					var newVal = obj [key];
-					if (newVal != null) {
-						var newValType = newVal.GetType ();
+					var newVal = obj[key];
+					if (newVal != null)
+					{
+						var newValType = newVal.GetType();
 
 						// compare deeper additions
 						if (
-							!newValType.IsPrimitive && 
+							!newValType.IsPrimitive &&
 							newValType != typeof(string)
-						) {
-							if (newVal is IDictionary) {
-								Generate(new IndexedDictionary<string, object>(), newVal as IndexedDictionary<string, object>, patches, addPath);
-
-							} else if (newVal is IList) {
-								Generate(new List<object>(), newVal as List<object>, patches, addPath);
+						)
+						{
+							if (newVal is IndexedDictionary<string, object> indexDictionaryInstance)
+							{
+								Generate(new IndexedDictionary<string, object>(), indexDictionaryInstance, patches, addPath);
+							}
+							else if (newVal is List<object> newValListInstance)
+							{
+								Generate(new List<object>(), newValListInstance, patches, addPath);
 							}
 						}
 					}
 
-					patches.Add(new PatchObject
-					{
-						operation = "add",
-						path = addPath.ToArray(),
-						value = newVal
-					});
+					patches.Add(new PatchObject(OperationType.add, addPath.ToArray(), newVal));
 				}
 			}
-
 		}
-
-//		protected static List<string> GetObjectKeys (object data)
-//		{
-//			if (data is IndexedDictionary<string, object>) {
-//				var d = (IndexedDictionary<string, object>)data;
-//				return d.Keys;
-//
-//			} else if (data is List<object>) {
-//				var d = (IndexedDictionary<string, object>)data;
-////				d.Keys
-//				return d.Keys;
-//			}
-//			
-//		}
-
 	}
 }

@@ -1,7 +1,8 @@
-using UnityEngine;
 using System.IO;
-using System.Text;
+
 using GameDevWare.Serialization;
+
+using UnityEngine;
 
 namespace Colyseus
 {
@@ -20,7 +21,7 @@ namespace Colyseus
 
 		public IndexedDictionary<string, object> GetState()
 		{
-			return State.state;
+			return State.State;
 		}
 
 		public void Patch(byte[] bytes, int offset)
@@ -52,6 +53,5 @@ namespace Colyseus
 		//	sb.Append("]");
 		//	Debug.Log(sb.ToString());
 		//}
-
 	}
 }
