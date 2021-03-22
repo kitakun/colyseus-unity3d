@@ -3,11 +3,11 @@ import express from "express";
 import cors from "cors";
 
 import { Server, LobbyRoom } from "colyseus";
-import socialRoutes from "@colyseus/social/express";
 
 import { DemoRoom } from "./rooms/DemoRoom";
 import { FossilDeltaRoom } from "./rooms/FossilDeltaRoom";
 import { RoomWithoutState } from "./rooms/RoomWithoutState";
+import { auth } from "./rooms/Auth";
 
 const PORT = Number(process.env.PORT || 2567);
 
@@ -30,12 +30,12 @@ gameServer.define("lobby", LobbyRoom);
 gameServer.define("fossildelta", FossilDeltaRoom);
 gameServer.define("no_state", RoomWithoutState);
 
-app.use("/", socialRoutes);
-
 app.get("/something", function (req, res) {
   console.log("something!", process.pid);
   res.send("Hey!");
 });
+
+auth.use(app);
 
 // Listen on specified PORT number
 gameServer.listen(PORT);

@@ -1,6 +1,6 @@
 import { Room, Client, generateId } from "colyseus";
 import { Schema, MapSchema, ArraySchema, Context } from "@colyseus/schema";
-import { verifyToken, User, IUser } from "@colyseus/social";
+import { storage as UserStorage } from './localUserStorage';
 
 // Create a context for this room's state data.
 const type = Context.create();
@@ -32,7 +32,7 @@ class Message extends Schema {
 
 export class DemoRoom extends Room {
 
-  onCreate (options: any) {
+  onCreate(options: any) {
     console.log("DemoRoom created.", options);
 
     this.setState(new State());
@@ -68,13 +68,14 @@ export class DemoRoom extends Room {
     });
   }
 
-  async onAuth (client, options) {
+  async onAuth(client, options) {
     console.log("onAuth(), options!", options);
-    return await User.findById(verifyToken(options.token)._id);
+    const foundedUser = UserStorage.findByToken(options.token);
+    return foundedUser;
   }
 
-  populateEnemies () {
-    for (let i=0; i<=3; i++) {
+  populateEnemies() {
+    for (let i = 0; i <= 3; i++) {
       const enemy = new Enemy();
       enemy.x = Math.random() * 2;
       enemy.y = Math.random() * 2;
@@ -82,14 +83,14 @@ export class DemoRoom extends Room {
     }
   }
 
-  onJoin (client: Client, options: any, user: IUser) {
+  onJoin(client: Client, options: any, user: any) {
     console.log("client joined!", client.sessionId);
     this.state.entities[client.sessionId] = new Player();
 
     client.send("type", { hello: true });
   }
 
-  async onLeave (client: Client, consented: boolean) {
+  async onLeave(client: Client, consented: boolean) {
     this.state.entities[client.sessionId].connected = false;
 
     try {
@@ -108,11 +109,11 @@ export class DemoRoom extends Room {
   }
 
 
-  update (dt?: number) {
+  update(dt?: number) {
     // console.log("num clients:", Object.keys(this.clients).length);
   }
 
-  onDispose () {
+  onDispose() {
     console.log("DemoRoom disposed.");
   }
 
