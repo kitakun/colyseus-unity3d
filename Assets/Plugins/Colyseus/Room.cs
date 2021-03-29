@@ -3,8 +3,8 @@ using System.IO;
 using System.Collections.Generic;
 // using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using GameDevWare.Serialization;
 using UnityEngine;
+using MessagePack;
 
 namespace Colyseus
 {
@@ -12,7 +12,7 @@ namespace Colyseus
 	public delegate void ColyseusCloseEventHandler(NativeWebSocket.WebSocketCloseCode code);
 	public delegate void ColyseusErrorEventHandler(int code, string message);
 
-    public interface IRoom
+	public interface IRoom
 	{
 		event ColyseusCloseEventHandler OnLeave;
 
@@ -22,6 +22,11 @@ namespace Colyseus
 
 	public class Room<T> : IRoom
 	{
+		static Room()
+		{
+			MessagePackSerializer.DefaultOptions = MessagePack.Resolvers.ContractlessStandardResolver.Options;
+		}
+
 		public delegate void RoomOnMessageEventHandler(object message);
 		public delegate void RoomOnStateChangeEventHandler(T state, bool isFirstState);
 
@@ -67,17 +72,17 @@ namespace Colyseus
 		/// The <see cref="Client"/> client connection instance.
 		/// </param>
 		/// <param name="name">The name of the room</param>
-		public Room (string name)
+		public Room(string name)
 		{
 			Name = name;
 		}
 
 		public async Task Connect()
 		{
-            await Connection.Connect();
+			await Connection.Connect();
 		}
 
-		public void SetConnection (Connection connection)
+		public void SetConnection(Connection connection)
 		{
 			Connection = connection;
 
@@ -88,12 +93,12 @@ namespace Colyseus
 
 			Connection.OnError += (message) => OnError?.Invoke(0, message);
 			Connection.OnMessage += (bytes) => ParseMessage(bytes);
-        }
+		}
 
 		public void SetState(byte[] encodedState, int offset)
 		{
 			serializer.SetState(encodedState, offset);
-			OnStateChange?.Invoke (serializer.GetState(), true);
+			OnStateChange?.Invoke(serializer.GetState(), true);
 		}
 
 		public T State
@@ -104,9 +109,10 @@ namespace Colyseus
 		/// <summary>
 		/// Leave the room.
 		/// </summary>
-		public async Task Leave (bool consented = true)
+		public async Task Leave(bool consented = true)
 		{
-			if (Id != null) {
+			if (Id != null)
+			{
 				if (consented)
 				{
 					await Connection.Send(new byte[] { Protocol.LEAVE_ROOM });
@@ -116,8 +122,10 @@ namespace Colyseus
 					await Connection.Close();
 				}
 
-			} else if (OnLeave != null) {
-				OnLeave?.Invoke (NativeWebSocket.WebSocketCloseCode.Normal);
+			}
+			else if (OnLeave != null)
+			{
+				OnLeave?.Invoke(NativeWebSocket.WebSocketCloseCode.Normal);
 			}
 		}
 
@@ -125,7 +133,7 @@ namespace Colyseus
 		/// Send a message by number type, without payload
 		/// </summary>
 		/// <param name="type">Message type</param>
-		public async Task Send (byte type)
+		public async Task Send(byte type)
 		{
 			await Connection.Send(new byte[] { Protocol.ROOM_DATA, type });
 		}
@@ -136,11 +144,8 @@ namespace Colyseus
 		/// <param name="message">Message payload</param>
 		public async Task Send(byte type, object message)
 		{
-			var serializationOutput = new MemoryStream();
-			MsgPack.Serialize(message, serializationOutput, SerializationOptions.SuppressTypeInformation);
-
 			byte[] initialBytes = { Protocol.ROOM_DATA, type };
-			byte[] encodedMessage = serializationOutput.ToArray();
+			byte[] encodedMessage = MessagePackSerializer.Serialize(message);
 
 			byte[] bytes = new byte[initialBytes.Length + encodedMessage.Length];
 			Buffer.BlockCopy(initialBytes, 0, bytes, 0, initialBytes.Length);
@@ -172,12 +177,9 @@ namespace Colyseus
 		/// <param name="message">Message payload</param>
 		public async Task Send(string type, object message)
 		{
-			var serializationOutput = new MemoryStream();
-			MsgPack.Serialize(message, serializationOutput, SerializationOptions.SuppressTypeInformation);
-
 			byte[] encodedType = System.Text.Encoding.UTF8.GetBytes(type);
 			byte[] initialBytes = Encode.getInitialBytesFromEncodedType(encodedType);
-			byte[] encodedMessage = serializationOutput.ToArray();
+			byte[] encodedMessage = MessagePackSerializer.Serialize(message);
 
 			byte[] bytes = new byte[encodedType.Length + encodedMessage.Length + initialBytes.Length];
 			Buffer.BlockCopy(initialBytes, 0, bytes, 0, initialBytes.Length);
@@ -211,7 +213,7 @@ namespace Colyseus
 			});
 		}
 
-		protected async void ParseMessage (byte[] bytes)
+		protected async void ParseMessage(byte[] bytes)
 		{
 			byte code = bytes[0];
 
@@ -219,7 +221,7 @@ namespace Colyseus
 			{
 				var offset = 1;
 
-				SerializerId = System.Text.Encoding.UTF8.GetString(bytes, offset+1, bytes[offset]);
+				SerializerId = System.Text.Encoding.UTF8.GetString(bytes, offset + 1, bytes[offset]);
 				offset += SerializerId.Length + 1;
 
 				if (SerializerId == "schema")
@@ -233,16 +235,19 @@ namespace Colyseus
 						DisplaySerializerErrorHelp(e, "Consider using the \"schema-codegen\" and providing the same room state for matchmaking instead of \"" + typeof(T).Name + "\"");
 					}
 
-				} else if (SerializerId == "fossil-delta")
+				}
+				else if (SerializerId == "fossil-delta")
 				{
 					try
 					{
 						serializer = (ISerializer<T>)new FossilDeltaSerializer();
-					} catch (Exception e)
+					}
+					catch (Exception e)
 					{
 						DisplaySerializerErrorHelp(e, "Consider using \"IndexedDictionary<string, object>\" instead of \"" + typeof(T).Name + "\" for matchmaking.");
 					}
-				} else
+				}
+				else
 				{
 					try
 					{
@@ -269,7 +274,7 @@ namespace Colyseus
 				Schema.Iterator it = new Schema.Iterator { Offset = 1 };
 				var errorCode = Decode.DecodeNumber(bytes, it);
 				var errorMessage = Decode.DecodeString(bytes, it);
-				OnError?.Invoke((int) errorCode, errorMessage);
+				OnError?.Invoke((int)errorCode, errorMessage);
 
 			}
 			else if (code == Protocol.ROOM_DATA_SCHEMA)
@@ -278,12 +283,11 @@ namespace Colyseus
 				var typeId = Decode.DecodeNumber(bytes, it);
 
 				Type messageType = Schema.Context.GetInstance().Get(typeId);
-				var message = (Schema.Schema) Activator.CreateInstance(messageType);
+				var message = (Schema.Schema)Activator.CreateInstance(messageType);
 
 				message.Decode(bytes, it);
 
-				IMessageHandler handler = null;
-				OnMessageHandlers.TryGetValue("s" + message.GetType(), out handler);
+				OnMessageHandlers.TryGetValue($"s{message.GetType()}", out IMessageHandler handler);
 
 				if (handler != null)
 				{
@@ -321,7 +325,8 @@ namespace Colyseus
 					type = Decode.DecodeNumber(bytes, it);
 					OnMessageHandlers.TryGetValue("i" + type, out handler);
 
-				} else
+				}
+				else
 				{
 					type = Decode.DecodeString(bytes, it);
 					OnMessageHandlers.TryGetValue(type.ToString(), out handler);
@@ -333,11 +338,16 @@ namespace Colyseus
 					// MsgPack deserialization can be optimized:
 					// https://github.com/deniszykov/msgpack-unity3d/issues/23
 					//
-					var message = (bytes.Length > it.Offset)
-						? MsgPack.Deserialize(handler.Type, new MemoryStream(bytes, it.Offset, bytes.Length - it.Offset, false))
-						: null;
+					if (bytes.Length > it.Offset)
+					{
+						// TODO get rid of MemoryStream
+						using (var ms = new MemoryStream(bytes, it.Offset, bytes.Length - it.Offset, false))
+						{
+							var recievedMessage = MessagePackSerializer.Deserialize(handler.Type, ms);
 
-					handler.Invoke(message);
+							handler.Invoke(recievedMessage);
+						}
+					}
 				}
 				else
 				{
@@ -346,7 +356,7 @@ namespace Colyseus
 			}
 		}
 
-		protected void Patch (byte[] delta, int offset)
+		protected void Patch(byte[] delta, int offset)
 		{
 			serializer.Patch(delta, offset);
 			OnStateChange?.Invoke(serializer.GetState(), false);

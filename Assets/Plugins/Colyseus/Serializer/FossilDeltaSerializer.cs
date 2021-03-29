@@ -1,11 +1,13 @@
-using System.IO;
+using System;
 
 using GameDevWare.Serialization;
+using MessagePack;
 
 using UnityEngine;
 
 namespace Colyseus
 {
+	[Obsolete("Make sure to use the Schema Serializer")]
 	public class FossilDeltaSerializer : ISerializer<IndexedDictionary<string, object>>
 	{
 		public StateContainer State = new StateContainer(new IndexedDictionary<string, object>());
@@ -16,7 +18,8 @@ namespace Colyseus
 			//Debug.Log("FULL STATE");
 			//PrintByteArray(rawEncodedState);
 			previousState = ArrayUtils.SubArray(rawEncodedState, offset, rawEncodedState.Length - 1);
-			State.Set(MsgPack.Deserialize<IndexedDictionary<string, object>>(new MemoryStream(previousState)));
+			var newStateData = MessagePackSerializer.Deserialize<IndexedDictionary<string, object>>(previousState);
+			State.Set(newStateData);
 		}
 
 		public IndexedDictionary<string, object> GetState()
@@ -29,7 +32,7 @@ namespace Colyseus
 			//Debug.Log("PATCH STATE");
 			//PrintByteArray(bytes);
 			previousState = Fossil.Delta.Apply(previousState, ArrayUtils.SubArray(bytes, offset, bytes.Length - 1));
-			var newState = MsgPack.Deserialize<IndexedDictionary<string, object>>(new MemoryStream(previousState));
+			var newState = MessagePackSerializer.Deserialize<IndexedDictionary<string, object>>(previousState);
 			State.Set(newState);
 		}
 

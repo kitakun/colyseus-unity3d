@@ -3,7 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-using GameDevWare.Serialization;
+using MessagePack;
 
 using UnityEngine;
 using UnityEngine.Networking;
@@ -57,9 +57,9 @@ namespace Colyseus
 		/// <param name="endpoint">
 		/// A <see cref="string"/> that represents the WebSocket URL to connect.
 		/// </param>
-		public Client (string endpoint)
+		public Client(string endpoint)
 		{
-			Endpoint = new UriBuilder(new Uri (endpoint));
+			Endpoint = new UriBuilder(new Uri(endpoint));
 			Auth = new Auth(Endpoint.Uri);
 		}
 
@@ -128,7 +128,7 @@ namespace Colyseus
 			return await GetAvailableRooms<RoomAvailable>(roomName);
 		}
 
-		public async Task<T[]> GetAvailableRooms<T> (string roomName = "")
+		public async Task<T[]> GetAvailableRooms<T>(string roomName = "")
 		{
 			var uriBuilder = new UriBuilder(Endpoint.Uri);
 			uriBuilder.Path += "matchmake/" + roomName;
@@ -215,8 +215,13 @@ namespace Colyseus
 			req.url = uriBuilder.Uri.ToString();
 
 			// Send JSON options on request body
+			// TODO create only 1 byte[] instead string+streamWriter+memoryStream
 			var jsonBodyStream = new MemoryStream();
-			Json.Serialize(options, jsonBodyStream);
+			var jsonString = MessagePackSerializer.ConvertToJson(MessagePackSerializer.Serialize(options));
+			using (var sw = new StreamWriter(jsonBodyStream))
+			{
+				sw.Write(jsonString);
+			}
 
 			req.uploadHandler = new UploadHandlerRaw(jsonBodyStream.ToArray())
 			{
@@ -225,7 +230,8 @@ namespace Colyseus
 			req.SetRequestHeader("Content-Type", "application/json");
 			req.SetRequestHeader("Accept", "application/json");
 
-			foreach (var header in headers) {
+			foreach (var header in headers)
+			{
 				req.SetRequestHeader(header.Key, header.Value);
 			}
 
@@ -246,16 +252,17 @@ namespace Colyseus
 			return await ConsumeSeatReservation<T>(response, headers);
 		}
 
-		protected Connection CreateConnection (string path = "", Dictionary<string, object> options = null, Dictionary<string, string> headers = null)
+		protected Connection CreateConnection(string path = "", Dictionary<string, object> options = null, Dictionary<string, string> headers = null)
 		{
-			if (options == null) {
-				options = new Dictionary<string, object> ();
+			if (options == null)
+			{
+				options = new Dictionary<string, object>();
 			}
 
 			var list = new List<string>();
-			foreach(var item in options)
+			foreach (var item in options)
 			{
-				list.Add(item.Key + "=" + ((item.Value != null) ? Convert.ToString(item.Value) : "null") );
+				list.Add(item.Key + "=" + ((item.Value != null) ? Convert.ToString(item.Value) : "null"));
 			}
 
 			UriBuilder uriBuilder = new UriBuilder(Endpoint.Uri)
@@ -264,7 +271,7 @@ namespace Colyseus
 				Query = string.Join("&", list.ToArray())
 			};
 
-			return new Connection (uriBuilder.ToString(), headers);
+			return new Connection(uriBuilder.ToString(), headers);
 		}
 
 	}

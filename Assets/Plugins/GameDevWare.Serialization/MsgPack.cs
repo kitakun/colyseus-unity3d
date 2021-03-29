@@ -36,10 +36,12 @@ namespace GameDevWare.Serialization
 			ExtensionTypeHandler = new DefaultMessagePackExtensionTypeHandler(EndianBitConverter.Big);
 		}
 
+		[Obsolete("BAD AND SLOW")]
 		public static void Serialize<T>(T objectToSerialize, Stream msgPackOutput)
 		{
 			Serialize(objectToSerialize, msgPackOutput, CreateDefaultContext(SerializationOptions.None));
 		}
+		[Obsolete("BAD AND SLOW")]
 		public static void Serialize<T>(T objectToSerialize, Stream msgPackOutput, SerializationOptions options)
 		{
 			Serialize(objectToSerialize, msgPackOutput, CreateDefaultContext(options));
@@ -79,14 +81,17 @@ namespace GameDevWare.Serialization
 			return reader.ReadValue(objectType, false);
 		}
 
+		[Obsolete("BAD AND SLOW")]
 		public static T Deserialize<T>(Stream msgPackInput)
 		{
 			return Deserialize<T>(msgPackInput, CreateDefaultContext(SerializationOptions.None));
 		}
+		[Obsolete("BAD AND SLOW")]
 		public static T Deserialize<T>(Stream msgPackInput, SerializationOptions options)
 		{
 			return Deserialize<T>(msgPackInput, CreateDefaultContext(options));
 		}
+		[Obsolete("BAD AND SLOW")]
 		public static T Deserialize<T>(Stream msgPackInput, SerializationContext context)
 		{
 			if (context == null) throw new ArgumentNullException("context");

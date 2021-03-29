@@ -13,33 +13,33 @@ using Colyseus.Schema;
 using GameDevWare.Serialization;
 
 [Serializable]
-class Metadata
+public class Metadata
 {
 	public string str;
 	public int number;
 }
 
 [Serializable]
-class CustomRoomAvailable : RoomAvailable
+public class CustomRoomAvailable : RoomAvailable
 {
 	public Metadata metadata;
 }
 
-class CustomData
+public class CustomData
 {
 	public int integer;
 	public string str;
 }
 
-class TypeMessage
+public class TypeMessage
 {
 	public bool hello;
 }
 
-enum MessageType {
+public enum MessageType {
 	ONE = 0
 };
-class MessageByEnum
+public class MessageByEnum
 {
 	public string str;
 }
@@ -211,8 +211,8 @@ public class ColyseusClient : MonoBehaviour {
 	{
 		if (room != null)
 		{
-			room.Send("schema");
-			room.Send("move_right", new CustomData()
+			_ = room.Send("schema");
+			_ = room.Send("move_right", new CustomData()
 			{
 				integer = 100,
 				str = "Hello world!"
