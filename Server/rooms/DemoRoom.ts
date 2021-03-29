@@ -30,7 +30,7 @@ class Message extends Schema {
   @type("string") str;
 }
 
-export class DemoRoom extends Room {
+export class DemoRoom extends Room<State> {
 
   onCreate(options: any) {
     console.log("DemoRoom created.", options);
